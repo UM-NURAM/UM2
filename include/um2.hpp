@@ -11,6 +11,7 @@
 #include <um2/mpact/model.hpp>
 #include <um2/mpact/powers.hpp>
 #include <um2/physics/material.hpp>
+#include <um2/physics/mpact_user_xs.hpp>
 
 //==============================================================================
 // Optional includes
