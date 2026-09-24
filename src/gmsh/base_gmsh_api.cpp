@@ -1011,6 +1011,21 @@ computeCrossField(std::vector<int> & viewTags)
 {
   ::gmsh::model::mesh::computeCrossField(viewTags);
 }
+// gmsh 4.14 moved triangulate/tetrahedralize to gmsh::algorithm, and
+// tetrahedralize gained a steiner point output argument.
+#if GMSH_API_VERSION_MAJOR > 4 || (GMSH_API_VERSION_MAJOR == 4 && GMSH_API_VERSION_MINOR >= 14)
+void
+triangulate(const std::vector<double> & coord, std::vector<std::size_t> & tri)
+{
+  ::gmsh::algorithm::triangulate(coord, tri);
+}
+void
+tetrahedralize(const std::vector<double> & coord, std::vector<std::size_t> & tetra)
+{
+  std::vector<double> steiner;
+  ::gmsh::algorithm::tetrahedralize(coord, tetra, steiner);
+}
+#else
 void
 triangulate(const std::vector<double> & coord, std::vector<std::size_t> & tri)
 {
@@ -1021,6 +1036,7 @@ tetrahedralize(const std::vector<double> & coord, std::vector<std::size_t> & tet
 {
   ::gmsh::model::mesh::tetrahedralize(coord, tetra);
 }
+#endif
 
 namespace field
 { // Mesh size field functions
