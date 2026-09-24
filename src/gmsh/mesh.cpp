@@ -43,6 +43,10 @@ generateMesh(MeshType const mesh_type, int const smooth_iters)
 {
   gmsh::option::setNumber("Mesh.SecondOrderIncomplete", 1);
   gmsh::option::setNumber("Mesh.Smoothing", smooth_iters);
+  // gmsh options are global, so reset the options that the mesh types below
+  // change, so that a previous call does not affect this one.
+  gmsh::option::setNumber("Mesh.RecombineAll", 0);
+  gmsh::option::setNumber("Mesh.SubdivisionAlgorithm", 0);
   // Int constexpr mesh_from_curvature = 8;
   switch (mesh_type) {
   case MeshType::Tri:
@@ -240,8 +244,13 @@ setMeshFieldFromKnudsenNumber(int const dim, um2::Vector<Material> const & mater
   std::vector<int> is_absorber(num_materials, 0);
   for (size_t i = 0; i < num_materials; ++i) {
     XSec const xs_avg_1g = materials[static_cast<Int>(i)].xsec().collapseTo1GroupAvg();
-    ASSERT(xs_avg_1g.t(0) > 0);
     double const sigma_t = xs_avg_1g.t(0);
+    if (sigma_t <= 0.0) {
+      // Void: the mean free path is infinite, so any mesh size satisfies the
+      // Knudsen number target. The size is set below.
+      LOG_INFO("Material ", materials[static_cast<Int>(i)].getName(), " is void");
+      continue;
+    }
     double const sigma_s = xs_avg_1g.s()[0];
     double const c = sigma_s / sigma_t;
     // The mean chord length of an equilateral triangle with side length l:
@@ -268,6 +277,18 @@ setMeshFieldFromKnudsenNumber(int const dim, um2::Vector<Material> const & mater
     auto const & material_name = materials[static_cast<Int>(i)].getName();
     LOG_INFO("Material ", material_name, ": lc = ", lcs[i], " cm, sigma_t = ", sigma_t,
              " cm^-1");
+  }
+
+  // Void materials use the largest mesh size of the other materials
+  double const max_lc = *std::max_element(lcs.begin(), lcs.end());
+  if (max_lc <= 0.0) {
+    LOG_ERROR("At least one material must have a positive total cross section");
+    return -1;
+  }
+  for (size_t i = 0; i < num_materials; ++i) {
+    if (lcs[i] <= 0.0) {
+      lcs[i] = max_lc;
+    }
   }
 
   // Create the base fields, which are constant in each material

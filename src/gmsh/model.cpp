@@ -53,16 +53,29 @@ addToPhysicalGroup(int const dim, std::vector<int> const & tags, int const tag,
       std::vector<int> new_tags(tags.size() + existing_tags.size());
       std::merge(tags.begin(), tags.end(), existing_tags.begin(), existing_tags.end(),
                  new_tags.begin());
-      gmsh::model::removePhysicalGroups({
-          {dim, existing_group_tag}
-      });
-#  if UM2_ENABLE_ASSERTS
-      int const new_tag =
-          gmsh::model::addPhysicalGroup(dim, new_tags, existing_group_tag, name);
-      ASSERT(new_tag == existing_group_tag);
-#  else
-      gmsh::model::addPhysicalGroup(dim, new_tags, existing_group_tag, name);
-#  endif
+      new_tags.erase(std::unique(new_tags.begin(), new_tags.end()), new_tags.end());
+      // Removing a single physical group and re-adding it with the same tag
+      // corrupts gmsh's internal physical group storage (at least in gmsh 4.15),
+      // which crashes gmsh::finalize(). Instead, remove all physical groups and
+      // re-add them.
+      gmsh::vectorpair all_dimtags;
+      gmsh::model::getPhysicalGroups(all_dimtags);
+      std::vector<std::string> names(all_dimtags.size());
+      std::vector<std::vector<int>> entities(all_dimtags.size());
+      for (size_t i = 0; i < all_dimtags.size(); ++i) {
+        gmsh::model::getPhysicalName(all_dimtags[i].first, all_dimtags[i].second,
+                                     names[i]);
+        gmsh::model::getEntitiesForPhysicalGroup(all_dimtags[i].first,
+                                                 all_dimtags[i].second, entities[i]);
+      }
+      gmsh::model::removePhysicalGroups();
+      for (size_t i = 0; i < all_dimtags.size(); ++i) {
+        bool const is_target =
+            all_dimtags[i].first == dim && all_dimtags[i].second == existing_group_tag;
+        gmsh::model::addPhysicalGroup(all_dimtags[i].first,
+                                      is_target ? new_tags : entities[i],
+                                      all_dimtags[i].second, names[i]);
+      }
       return;
     }
   }
