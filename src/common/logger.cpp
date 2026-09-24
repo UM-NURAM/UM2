@@ -29,6 +29,8 @@ bool & exit_on_error = um2::settings::logger::exit_on_error;
 TimePoint start_time = Clock::now();
 char buffer[buffer_size] = {0};
 char const * const buffer_end = buffer + buffer_size;
+int32_t error_count = 0;
+char first_error[buffer_size] = {0};
 
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
@@ -47,6 +49,29 @@ reset() noexcept
 
   // Reset data
   start_time = Clock::now();
+  clearErrors();
+}
+
+void
+clearErrors() noexcept
+{
+  error_count = 0;
+  first_error[0] = '\0';
+}
+
+void
+recordError(char const * first, char const * last) noexcept
+{
+  ++error_count;
+  if (error_count > 1) {
+    return;
+  }
+  char * dst = first_error;
+  char const * const dst_end = first_error + buffer_size - 1;
+  while (first != last && dst != dst_end) {
+    *dst++ = *first++;
+  }
+  *dst = '\0';
 }
 
 //==============================================================================

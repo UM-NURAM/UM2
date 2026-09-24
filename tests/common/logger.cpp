@@ -38,7 +38,40 @@ TEST_CASE(logger_test)
   um2::logger::info(s, " with multiple", " arguments");
 }
 
-TEST_SUITE(logger) { TEST(logger_test); }
+TEST_CASE(logger_error_recording)
+{
+  um2::logger::reset();
+  um2::logger::exit_on_error = false;
+  ASSERT(um2::logger::error_count == 0);
+  ASSERT(um2::logger::first_error[0] == '\0');
+
+  // Warnings are not recorded
+  um2::logger::warn("not an error");
+  ASSERT(um2::logger::error_count == 0);
+
+  um2::logger::error("first ", 1);
+  um2::logger::error("second ", 2);
+  ASSERT(um2::logger::error_count == 2);
+  ASSERT(um2::String(um2::logger::first_error) == um2::String("first 1"));
+
+  // Errors are recorded even when they are not printed
+  um2::logger::level = um2::logger::levels::off;
+  um2::logger::clearErrors();
+  um2::logger::error("silent");
+  ASSERT(um2::logger::error_count == 1);
+  ASSERT(um2::String(um2::logger::first_error) == um2::String("silent"));
+
+  um2::logger::clearErrors();
+  ASSERT(um2::logger::error_count == 0);
+  ASSERT(um2::logger::first_error[0] == '\0');
+  um2::logger::reset();
+}
+
+TEST_SUITE(logger)
+{
+  TEST(logger_test);
+  TEST(logger_error_recording);
+}
 
 auto
 main() -> int

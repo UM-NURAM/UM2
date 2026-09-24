@@ -13,6 +13,8 @@
 //  - prefix messages with a timestamp
 //  - colorize messages based on their verbosity level
 //  - exit the program after an error is logged (or not)
+//  - record the first error message since clearErrors(), so that callers which disable
+//    exit_on_error (e.g. the Python bindings) can detect and report errors
 //
 // The logger:
 // - can be configured at compile time by defining the MAX_LOG_LEVEL macro.
@@ -52,6 +54,8 @@ extern TimePoint start_time;
 inline constexpr int32_t buffer_size = 256;
 extern char buffer[buffer_size];
 extern char const * const buffer_end; // 1 past the last valid character in the buffer
+extern int32_t error_count;            // Number of errors logged since clearErrors()
+extern char first_error[buffer_size];  // First error since clearErrors() (no preamble)
 
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
@@ -68,6 +72,15 @@ getLastMessage() noexcept -> StringView
 // Reset the logger to its default state
 void
 reset() noexcept;
+
+// Reset error_count and first_error
+void
+clearErrors() noexcept;
+
+// Increment error_count and, if it is the first error, store the message in
+// [first, last)
+void
+recordError(char const * first, char const * last) noexcept;
 
 // Write types to the buffer
 template <class T>
@@ -108,8 +121,10 @@ template <class... Args>
 void
 printMessage(int32_t const msg_level, Args const &... args) noexcept
 {
-  if (msg_level <= level) {
+  // Errors are always recorded, even if they are not printed.
+  if (msg_level <= level || msg_level == levels::error) {
     char * buffer_pos = setPreamble(msg_level);
+    char const * const msg_start = buffer_pos;
 
     // Use fold expression to send each argument to the buffer.
     // We need a lambda function to capture the buffer_pos variable, since it is
@@ -117,7 +132,15 @@ printMessage(int32_t const msg_level, Args const &... args) noexcept
     ([&buffer_pos](auto const & arg) { buffer_pos = toBuffer(buffer_pos, arg); }(args),
      ...);
 
+    if (msg_level == levels::error) {
+      recordError(msg_start, buffer_pos);
+    }
+
     setPostamble(buffer_pos);
+
+    if (msg_level > level) {
+      return;
+    }
 
     // Print the message
     int fprintf_result = 0;
