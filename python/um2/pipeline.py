@@ -160,7 +160,7 @@ def mesh_geometry(model, *, plan=None, cross_sections=None, library=None,
                   mesh_type='QuadraticTri', mesh_size=None, kn_target=None,
                   fuel_mfp_threshold=-1.0, fuel_mfp_scale=-1.0,
                   abs_mfp_threshold=-1.0, abs_mfp_scale=-1.0,
-                  fill_material=None, smooth_iters=100, output=None,
+                  fill_material=VOID_MATERIAL_NAME, smooth_iters=100, output=None,
                   write_knudsen_data=False, write_xsec_data=False,
                   mesh_file=None, new_gmsh_model=True, mesh_threads=1):
     """Mesh a model with UM2 and (optionally) write it as an MPACT model.
@@ -200,11 +200,12 @@ def mesh_geometry(model, *, plan=None, cross_sections=None, library=None,
         materials.
     fuel_mfp_threshold, fuel_mfp_scale, abs_mfp_threshold, abs_mfp_scale : float
         Parameters of the Knudsen number mesh field (see UM2)
-    fill_material : str, optional
+    fill_material : str
         Name of the material that fills parts of coarse cells that are not
         covered by the geometry (e.g. outside of a cylindrical or hexagonal
-        boundary). Defaults to a void material, ``'Void'``, with zero cross
-        sections.
+        boundary). The default, ``'Void'``, is a void material with zero cross
+        sections. Otherwise, it must be the (UM2) name of a material of the
+        geometry. It is not used if the geometry covers the coarse cells.
     smooth_iters : int
         Number of mesh smoothing iterations
     output : path-like, optional
@@ -256,17 +257,18 @@ def mesh_geometry(model, *, plan=None, cross_sections=None, library=None,
     if covered < total * (1 - 1e-6):
         warnings.warn(f'{total - covered:.6g} cm^2 of the coarse cells is not '
                       'covered by the geometry and will be filled with '
-                      f'{fill_material or VOID_MATERIAL_NAME!r}')
+                      f'{fill_material!r}')
 
     um2_mats = um2_materials(build, materials, cross_sections, library)
-    if fill_material is None:
-        if covered < total * (1 - 1e-6):
-            # Space outside of the OpenMC geometry is void
-            fill_material = VOID_MATERIAL_NAME
-        else:
-            # The fill material only fills gaps due to round-off
-            areas = build.material_areas()
-            fill_material = max(areas, key=areas.get)
+    if fill_material != VOID_MATERIAL_NAME and fill_material not in um2_mats:
+        raise KeyError(f'Fill material "{fill_material}" is not a material of the '
+                       f'geometry ({list(um2_mats)})')
+    if covered >= total * (1 - 1e-6):
+        # The geometry covers the coarse cells, so the fill material only fills
+        # gaps due to round-off. Use an existing material, so that no unused
+        # (e.g. void) material is added to the model.
+        areas = build.material_areas()
+        fill_material = max(areas, key=areas.get)
     if fill_material == VOID_MATERIAL_NAME and fill_material not in um2_mats:
         void = core.Material(VOID_MATERIAL_NAME)
         void.color = material_color(VOID_MATERIAL_NAME)

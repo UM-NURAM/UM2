@@ -170,3 +170,26 @@ def test_c5g7_core(gmsh_session, tmp_path):
     assert float(volumes['gt']) == pytest.approx(4 * 2 * pin_area, rel=1e-4)
     assert float(volumes['uo2']) == pytest.approx(2 * 287 * pin_area, rel=1e-4)
     assert sum(map(float, volumes.values())) == pytest.approx(64.26**2, rel=1e-9)
+
+
+def test_fill_material(gmsh_session):
+    """fill_material (default 'Void') fills space outside the geometry, and is
+    not added when the geometry covers the coarse cells."""
+    model = pin_model(C5G7_XSL)
+    result = um2.mesh_geometry(model, kn_target=8.0)
+    assert set(result.materials) == {'UO2-3.3', 'Moderator'}
+
+    gmsh_session.model.add('hex')
+    model = pin_model(C5G7_XSL)
+    root = model.geometry.root_universe
+    _, mod_cell = root.cells.values()
+    hexagon = openmc.model.HexagonalPrism(edge_length=1.0, boundary_type='vacuum')
+    mod_cell.region = +next(iter(root.cells.values())).region.surface & -hexagon
+    with pytest.warns(UserWarning, match="filled with 'Moderator'"):
+        result = um2.mesh_geometry(model, kn_target=8.0, fill_material='Moderator',
+                                   new_gmsh_model=False)
+    assert 'Void' not in result.materials
+    areas = um2.material_areas()
+    assert sum(areas.values()) == pytest.approx(result.plan.size[0] * result.plan.size[1])
+    with pytest.raises(KeyError, match='not a material'):
+        um2.mesh_geometry(pin_model(C5G7_XSL), fill_material='bogus')
