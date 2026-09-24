@@ -32,6 +32,9 @@ option(UM2_BUILD_SHARED_LIB "Build UM2 as a shared library" ON)
 # UM2.
 option(UM2_BUILD_TESTS "Build tests" ON)
 
+# Build the Python bindings (requires pybind11)
+option(UM2_BUILD_PYTHON "Build the Python bindings" OFF)
+
 # Features
 #------------------------------------------------------------------------------
 
@@ -332,6 +335,7 @@ set(UM2_SOURCES
     "src/physics/nuclide.cpp"
     "src/physics/cross_section_library.cpp"
     "src/physics/material.cpp"
+    "src/physics/mpact_user_xs.cpp"
     "src/physics/cmfd.cpp"
     "src/mpact/model.cpp"
     "src/mpact/powers.cpp"
@@ -540,6 +544,10 @@ endif()
 if (UM2_BUILD_TESTS)
   include(CTest)
   add_subdirectory(tests)
+endif()
+
+if (UM2_BUILD_PYTHON)
+  add_subdirectory(python)
 endif()
 
 #===============================================================================

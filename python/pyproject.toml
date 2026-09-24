@@ -1,0 +1,31 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "pybind11>=2.12"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "um2"
+version = "0.1.0"
+description = "UM2: unstructured mesh generation for MOC, with an OpenMC-compatible Python API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["numpy", "gmsh", "h5py"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.scikit-build]
+# Build the whole UM2 project (the Python bindings are in python/)
+cmake.source-dir = ".."
+wheel.packages = ["um2"]
+build-dir = "build/{wheel_tag}"
+
+[tool.scikit-build.cmake.define]
+UM2_BUILD_PYTHON = "ON"
+UM2_BUILD_TESTS = "OFF"
+UM2_BUILD_POSTPROCESS = "OFF"
+UM2_USE_MPACT_XSLIBS = "OFF"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["slow: tests that take more than a minute (deselect with -m 'not slow')"]

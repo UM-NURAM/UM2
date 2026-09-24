@@ -1,0 +1,6 @@
+# Build products
+build/
+*.so
+__pycache__/
+*.egg-info/
+.pytest_cache/
