@@ -343,8 +343,12 @@ def _public_members(module):
 
 def check_api(openmc_src: Path, verbose: bool = False) -> int:
     """Check um2.openmc signatures against OpenMC. Returns the number of errors."""
-    sys.path.insert(0, str(REPO_ROOT / "python"))
     import importlib
+    try:
+        importlib.import_module("um2.openmc")
+    except ImportError:
+        # um2.openmc is pure Python, so it can also be used from the source tree
+        sys.path.insert(0, str(REPO_ROOT / "python"))
 
     index = index_openmc(openmc_src)
     modules = ["um2.openmc", "um2.openmc.model", "um2.openmc.mgxs",

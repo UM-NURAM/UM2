@@ -9,7 +9,13 @@ TESTS = Path(__file__).resolve().parent
 REPO = TESTS.parents[1]
 sys.path.insert(0, str(TESTS))
 
-import um2.openmc as openmc  # noqa: E402
+try:
+    import um2.openmc as openmc  # noqa: E402
+except ImportError as e:
+    raise ImportError(
+        'The um2 package was not found. Build UM2 with -DUM2_BUILD_PYTHON=ON and '
+        'add <build>/python to PYTHONPATH (e.g. "source <build>/python/env.sh"), '
+        'or install it with "pip install ./python".') from e
 
 C5G7_XSL = REPO / 'tests' / 'physics' / 'xs_files' / 'c5g7.xsl'
 
@@ -24,8 +30,8 @@ def _has_core():
 
 
 HAS_CORE = _has_core()
-requires_core = pytest.mark.skipif(not HAS_CORE,
-                                   reason='um2._um2 (C++ bindings) not built')
+requires_core = pytest.mark.skipif(
+    not HAS_CORE, reason='um2._um2 (C++ bindings) not found; see python/README.md')
 
 
 @pytest.fixture(autouse=True)
@@ -58,3 +64,9 @@ def gmsh_session():
 def c5g7_library():
     from um2 import xs
     return xs.read_xsl(C5G7_XSL)
+
+
+def pytest_report_header(config):
+    import um2
+    core = 'found' if HAS_CORE else 'NOT found (tests that need it are skipped)'
+    return [f'um2: {Path(um2.__file__).parent}', f'um2 C++ extension: {core}']

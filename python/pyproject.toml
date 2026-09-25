@@ -18,7 +18,6 @@ test = ["pytest"]
 # Build the whole UM2 project (the Python bindings are in python/)
 cmake.source-dir = ".."
 wheel.packages = ["um2"]
-build-dir = "build/{wheel_tag}"
 
 [tool.scikit-build.cmake.define]
 UM2_BUILD_PYTHON = "ON"
@@ -28,4 +27,6 @@ UM2_USE_MPACT_XSLIBS = "OFF"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Do not write a .pytest_cache directory into the source tree
+addopts = "-p no:cacheprovider"
 markers = ["slow: tests that take more than a minute (deselect with -m 'not slow')"]

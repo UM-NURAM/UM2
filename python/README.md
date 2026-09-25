@@ -147,22 +147,41 @@ given.
 
 ## Building and testing
 
-The C++ extension is built with UM2 (CMake option `UM2_BUILD_PYTHON`). UM2 must
-be built against the **same libgmsh** as the `gmsh` Python module, e.g. with
-conda:
+The C++ extension (`um2._um2`) is built with UM2 when the CMake option
+`UM2_BUILD_PYTHON` is on. UM2 must use the **same libgmsh** as the `gmsh`
+Python module, so build it in the Python environment you will use it from,
+with `GMSH_ROOT` pointing at that environment. With conda:
 
 ```bash
-conda install -c conda-forge gmsh hdf5 pugixml pybind11 scikit-build-core numpy h5py pytest
+conda activate UM2-pythonAPI     # needs gmsh hdf5 pugixml pybind11 numpy h5py pytest
 export GMSH_ROOT=$CONDA_PREFIX
-
-# Either: install the package
-pip install ./python --no-build-isolation
-
-# Or: a development build, which puts um2/_um2*.so in python/um2
-cmake -S . -B build -DUM2_BUILD_PYTHON=ON -DCMAKE_PREFIX_PATH=$CONDA_PREFIX
-cmake --build build -j
-PYTHONPATH=$PWD/python python -m pytest python/tests
+mkdir ~/build && cd ~/build
+cmake -DUM2_BUILD_PYTHON=ON -DUM2_USE_MPACT_XSLIBS=OFF ~/UM2
+make -j
 ```
+
+(`-DUM2_USE_MPACT_XSLIBS=OFF` skips the C++ tests that need MPACT's
+cross-section libraries in `UM2/MPACT_Extras`. Leave it out if you have them.)
+
+Nothing is written to the source tree. The build directory contains a
+complete, importable package in `~/build/python/um2`, with the Python sources
+copied from `UM2/python/um2` whenever they change (just re-run `make` after
+editing them). To use it:
+
+```bash
+source ~/build/python/env.sh     # adds ~/build/python to PYTHONPATH
+python -c "import um2, um2.openmc"
+python -m pytest ~/UM2/python/tests          # or: ctest -R python_tests
+```
+
+CMake prints the Python it uses ("UM2 Python bindings: using ...") and warns
+if that Python's gmsh module loads a different libgmsh than UM2 links against.
+Don't run the tests from inside `UM2/python`: Python would then import the
+source copy of `um2`, which has no C++ extension, and most tests would be
+skipped.
+
+Alternatively, `pip install ~/UM2/python --no-build-isolation` builds UM2 and
+installs the package (with `libum2.so`) into the active environment.
 
 `um2.openmc` and `um2.xs` work without the C++ extension.
 
