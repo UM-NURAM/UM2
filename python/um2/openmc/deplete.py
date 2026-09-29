@@ -1,5 +1,7 @@
 """Stub of :mod:`openmc.deplete` (depletion requires running OpenMC)."""
 
+from __future__ import annotations
+
 from ..errors import UM2NotSupportedError
 
 

@@ -1,5 +1,7 @@
 """Natural elements (compatible with :class:`openmc.Element`)."""
 
+from __future__ import annotations
+
 import re
 import warnings
 import xml.etree.ElementTree as ET

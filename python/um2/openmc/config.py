@@ -1,5 +1,7 @@
 """Global configuration (compatible with :data:`openmc.config`)."""
 
+from __future__ import annotations
+
 from collections.abc import MutableMapping
 from contextlib import contextmanager
 import os

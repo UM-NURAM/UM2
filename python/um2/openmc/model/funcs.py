@@ -1,5 +1,7 @@
 """Helper functions (subset of :mod:`openmc.model.funcs`)."""
 
+from __future__ import annotations
+
 from collections.abc import Iterable
 from math import sqrt
 from operator import attrgetter

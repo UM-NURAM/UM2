@@ -1,5 +1,7 @@
 """Exceptions raised by UM2."""
 
+from __future__ import annotations
+
 
 class UM2Error(RuntimeError):
     """An error reported by the UM2 C++ library."""

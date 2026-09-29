@@ -1,5 +1,7 @@
 """Macroscopic data sets (compatible with :class:`openmc.Macroscopic`)."""
 
+from __future__ import annotations
+
 from . import checkvalue as cv
 
 

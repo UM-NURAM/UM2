@@ -17,6 +17,8 @@ UM2 and the gmsh Python API share the same gmsh model, so the gmsh API can be
 used at any point (e.g. ``gmsh.fltk.run()`` to view the model).
 """
 
+from __future__ import annotations
+
 from .errors import UM2Error, UM2NotSupportedError
 from . import mpact, xs
 from .build import build_geometry, material_areas, material_names

@@ -1,5 +1,7 @@
 """Energy group structures (compatible with :class:`openmc.mgxs.EnergyGroups`)."""
 
+from __future__ import annotations
+
 import copy
 from collections.abc import Iterable
 from numbers import Real

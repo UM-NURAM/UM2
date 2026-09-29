@@ -1,5 +1,7 @@
 """Input validation helpers (compatible with :mod:`openmc.checkvalue`)."""
 
+from __future__ import annotations
+
 import copy
 import os
 from collections.abc import Iterable

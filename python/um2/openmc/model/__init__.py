@@ -1,5 +1,7 @@
 """Subset of :mod:`openmc.model` supported by UM2."""
 
+from __future__ import annotations
+
 from .funcs import hexagonal_prism, pin, rectangular_prism, subdivide
 from .model import Model
 from .surface_composite import (CompositeSurface, ConicalFrustum, CruciformPrism,

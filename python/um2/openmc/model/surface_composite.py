@@ -5,6 +5,8 @@ Only composite surfaces that are Z-invariant (``axis='z'``) are supported.
 used to bound the model axially.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from copy import copy

@@ -1,5 +1,7 @@
 """Model container (compatible with :class:`openmc.Model`)."""
 
+from __future__ import annotations
+
 from collections.abc import Iterable
 from pathlib import Path
 

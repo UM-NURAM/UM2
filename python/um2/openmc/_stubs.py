@@ -6,6 +6,8 @@ scripts run unchanged) but have no effect. A :class:`UM2IgnoredWarning` is
 issued the first time each ignored feature is used.
 """
 
+from __future__ import annotations
+
 import warnings
 
 from ..errors import UM2NotSupportedError

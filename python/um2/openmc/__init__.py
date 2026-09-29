@@ -28,6 +28,8 @@ OpenMC release recorded in :data:`OPENMC_VERSION` by
 ``python/tools/sync_openmc.py``.
 """
 
+from __future__ import annotations
+
 import sys
 
 from ..errors import UM2NotSupportedError

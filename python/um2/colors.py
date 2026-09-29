@@ -6,6 +6,8 @@ groups. Colors are assigned deterministically from the material name unless
 they are set explicitly with :func:`set_material_color`.
 """
 
+from __future__ import annotations
+
 import colorsys
 import hashlib
 

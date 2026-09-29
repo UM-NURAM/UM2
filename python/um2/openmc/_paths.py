@@ -1,5 +1,7 @@
 """Path helpers (subset of openmc.utility_funcs)."""
 
+from __future__ import annotations
+
 from pathlib import Path
 
 

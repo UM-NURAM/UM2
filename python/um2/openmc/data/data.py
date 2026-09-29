@@ -5,6 +5,8 @@ python/tools/sync_openmc.py. Element names and symbols replace the tables that
 OpenMC imports from the ``endf`` package.
 """
 
+from __future__ import annotations
+
 import itertools
 import os
 import re

@@ -6,6 +6,8 @@ h5py). The conversion routines between scattering representations
 (``convert_representation`` and ``convert_scatter_format``) are not provided.
 """
 
+from __future__ import annotations
+
 import copy
 from numbers import Integral, Real
 

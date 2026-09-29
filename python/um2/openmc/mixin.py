@@ -1,5 +1,7 @@
 """Automatic ID management (compatible with :mod:`openmc.mixin`)."""
 
+from __future__ import annotations
+
 from numbers import Integral
 from warnings import warn
 

@@ -1,5 +1,7 @@
 """Stub of :mod:`openmc.stats` (source distributions are ignored by UM2)."""
 
+from __future__ import annotations
+
 from ._stubs import _Stub, _make
 
 _NAMES = ['Univariate', 'Discrete', 'Uniform', 'PowerLaw', 'Maxwell', 'Watt',

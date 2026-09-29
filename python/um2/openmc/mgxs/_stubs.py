@@ -1,5 +1,7 @@
 """Stubs for tally-based MGXS generation, which requires running OpenMC."""
 
+from __future__ import annotations
+
 from ...errors import UM2NotSupportedError
 
 

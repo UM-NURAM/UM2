@@ -6,6 +6,8 @@ running OpenMC and are provided as stubs that raise
 :class:`um2.errors.UM2NotSupportedError` when they would need transport results.
 """
 
+from __future__ import annotations
+
 import numpy as np
 
 from ._group_structures import GROUP_STRUCTURES_DATA
