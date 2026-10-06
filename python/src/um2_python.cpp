@@ -6,6 +6,13 @@
 // generation, and I/O. The gmsh model itself is shared with the gmsh Python
 // API, since both use the same libgmsh.
 //
+// The GIL is released during every call into UM2/gmsh C++ (see the
+// py::gil_scoped_release in each function below). UM2 and gmsh print a lot to the C-level
+// stdout, which Jupyter kernels redirect into a pipe that is drained by a Python thread. If
+// the GIL were held during the call, that thread could not run, the 64 KB pipe would fill
+// up, the write would block, and the kernel would hang (a deadlock). The functions below
+// only use C++ objects after the GIL is released.
+//
 // UM2 reports errors through its logger. The bindings disable exit-on-error,
 // clear the recorded errors before each call, and raise um2.UM2Error if an
 // error was logged during the call.
@@ -182,6 +189,7 @@ setXSec(um2::Material & mat, FloatArray const & a, FloatArray const & f,
       xs.isFissile() = true;
     }
   }
+  py::gil_scoped_release nogil;
   ErrorScope scope;
   xs.validate();
   mat.xsec() = um2::move(xs);
@@ -356,6 +364,7 @@ PYBIND11_MODULE(_um2, m)
            "Return the macroscopic cross section as a dict of numpy arrays.")
       .def("validate_xsec",
            [](um2::Material const & mat) {
+             py::gil_scoped_release nogil;
              ErrorScope scope;
              mat.validateXSec();
              ErrorScope::check();
@@ -372,6 +381,7 @@ PYBIND11_MODULE(_um2, m)
                                         "An MPACT user (macroscopic) cross section "
                                         "library (.xsl).")
       .def(py::init([](std::string const & filename) {
+             py::gil_scoped_release nogil;
              ErrorScope scope;
              um2::mpact::UserXSLibrary lib(toUM2String(filename));
              ErrorScope::check();
@@ -425,6 +435,7 @@ PYBIND11_MODULE(_um2, m)
       .def(
           "add_material",
           [](um2::mpact::Model & model, um2::Material const & mat, bool validate) {
+            py::gil_scoped_release nogil;
             ErrorScope scope;
             Int const id = model.addMaterial(mat, validate);
             ErrorScope::check();
@@ -434,6 +445,7 @@ PYBIND11_MODULE(_um2, m)
       .def(
           "add_coarse_cell",
           [](um2::mpact::Model & model, std::tuple<Float, Float> xy_extents) {
+            py::gil_scoped_release nogil;
             ErrorScope scope;
             Int const id = model.addCoarseCell(
                 um2::Vec2F(std::get<0>(xy_extents), std::get<1>(xy_extents)));
@@ -444,6 +456,7 @@ PYBIND11_MODULE(_um2, m)
       .def(
           "add_rtm",
           [](um2::mpact::Model & model, std::vector<std::vector<Int>> const & ids) {
+            py::gil_scoped_release nogil;
             ErrorScope scope;
             Int const id = model.addRTM(toVector2D(ids));
             ErrorScope::check();
@@ -455,6 +468,7 @@ PYBIND11_MODULE(_um2, m)
       .def(
           "add_lattice",
           [](um2::mpact::Model & model, std::vector<std::vector<Int>> const & ids) {
+            py::gil_scoped_release nogil;
             ErrorScope scope;
             Int const id = model.addLattice(toVector2D(ids));
             ErrorScope::check();
@@ -466,6 +480,7 @@ PYBIND11_MODULE(_um2, m)
           "add_assembly",
           [](um2::mpact::Model & model, std::vector<Int> const & ids,
              std::vector<Float> const & z) {
+            py::gil_scoped_release nogil;
             ErrorScope scope;
             Int const id = model.addAssembly(toVector(ids), toVector(z));
             ErrorScope::check();
@@ -475,6 +490,7 @@ PYBIND11_MODULE(_um2, m)
       .def(
           "add_core",
           [](um2::mpact::Model & model, std::vector<std::vector<Int>> const & ids) {
+            py::gil_scoped_release nogil;
             ErrorScope scope;
             Int const id = model.addCore(toVector2D(ids));
             ErrorScope::check();
@@ -486,6 +502,7 @@ PYBIND11_MODULE(_um2, m)
           "add_coarse_grid",
           [](um2::mpact::Model & model, std::tuple<Float, Float> xy_extents,
              std::tuple<Int, Int> num_cells) {
+            py::gil_scoped_release nogil;
             ErrorScope scope;
             model.addCoarseGrid(
                 um2::Vec2F(std::get<0>(xy_extents), std::get<1>(xy_extents)),
@@ -496,6 +513,7 @@ PYBIND11_MODULE(_um2, m)
       .def(
           "import_coarse_cell_meshes",
           [](um2::mpact::Model & model, std::string const & filename) {
+            py::gil_scoped_release nogil;
             ErrorScope scope;
             model.importCoarseCellMeshes(toUM2String(filename));
             ErrorScope::check();
@@ -505,6 +523,7 @@ PYBIND11_MODULE(_um2, m)
           "write",
           [](um2::mpact::Model const & model, std::string const & filename,
              bool write_knudsen_data, bool write_xsec_data) {
+            py::gil_scoped_release nogil;
             ErrorScope scope;
             model.write(toUM2String(filename), write_knudsen_data, write_xsec_data);
             ErrorScope::check();
@@ -516,6 +535,7 @@ PYBIND11_MODULE(_um2, m)
       .def(
           "read",
           [](um2::mpact::Model & model, std::string const & filename) {
+            py::gil_scoped_release nogil;
             ErrorScope scope;
             model.read(toUM2String(filename));
             ErrorScope::check();
@@ -585,6 +605,7 @@ PYBIND11_MODULE(_um2, m)
   gm.def(
       "overlay_coarse_grid",
       [](um2::mpact::Model const & model, um2::Material const & fill) {
+        py::gil_scoped_release nogil;
         ErrorScope scope;
         um2::gmsh::model::occ::overlayCoarseGrid(model, fill);
         ErrorScope::check();
@@ -596,6 +617,7 @@ PYBIND11_MODULE(_um2, m)
   gm.def(
       "set_global_mesh_size",
       [](double size) {
+        py::gil_scoped_release nogil;
         ErrorScope scope;
         um2::gmsh::model::mesh::setGlobalMeshSize(size);
         ErrorScope::check();
@@ -607,6 +629,7 @@ PYBIND11_MODULE(_um2, m)
       [](int dim, std::vector<um2::Material> const & materials, double kn_target,
          double fuel_mfp_threshold, double fuel_mfp_scale, double abs_mfp_threshold,
          double abs_mfp_scale) {
+        py::gil_scoped_release nogil;
         ErrorScope scope;
         int const field = um2::gmsh::model::mesh::setMeshFieldFromKnudsenNumber(
             dim, toVector(materials), kn_target, fuel_mfp_threshold, fuel_mfp_scale,
@@ -621,6 +644,7 @@ PYBIND11_MODULE(_um2, m)
   gm.def(
       "generate_mesh",
       [](um2::MeshType mesh_type, int smooth_iters) {
+        py::gil_scoped_release nogil;
         ErrorScope scope;
         um2::gmsh::model::mesh::generateMesh(mesh_type, smooth_iters);
         ErrorScope::check();
@@ -630,6 +654,7 @@ PYBIND11_MODULE(_um2, m)
   gm.def(
       "write",
       [](std::string const & filename, bool extra_info) {
+        py::gil_scoped_release nogil;
         ErrorScope scope;
         um2::gmsh::write(filename, extra_info);
         ErrorScope::check();
@@ -640,6 +665,7 @@ PYBIND11_MODULE(_um2, m)
       "get_materials",
       []() {
         std::vector<um2::Material> materials;
+        py::gil_scoped_release nogil;
         ErrorScope scope;
         um2::gmsh::model::getMaterials(materials);
         ErrorScope::check();
