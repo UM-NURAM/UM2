@@ -21,8 +21,9 @@ Group <https://nuram.engin.umich.edu/>`_ at the `University of Michigan
    --------
 
 .. toctree::
-    :maxdepth: 1
+    :maxdepth: 2
 
     install
     mpact
+    python/index
     license

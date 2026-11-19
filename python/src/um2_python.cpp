@@ -525,13 +525,56 @@ PYBIND11_MODULE(_um2, m)
              bool write_knudsen_data, bool write_xsec_data) {
             py::gil_scoped_release nogil;
             ErrorScope scope;
-            model.write(toUM2String(filename), write_knudsen_data, write_xsec_data);
+
+            model.write(toUM2String(filename),
+                        write_knudsen_data,
+                        write_xsec_data);
+
             ErrorScope::check();
           },
-          py::arg("filename"), py::arg("write_knudsen_data") = false,
+          py::arg("filename"),
+          py::arg("write_knudsen_data") = false,
           py::arg("write_xsec_data") = false,
-          "Write the model to an XDMF file (plus the MPACT input, material volume "
-          "and cross section files).")
+          "Write the model to XDMF and associated MPACT files.")
+      .def(
+          "write",
+          [](um2::mpact::Model const & model,
+             std::string const & filename,
+             std::string const & xsl_filename,
+             std::vector<std::tuple<std::string, std::string, Int>> const & mappings,
+             std::vector<Int> const & boundary_conditions,
+             bool write_knudsen_data,
+             bool write_xsec_data) {
+
+            um2::mpact::MPACTExportOptions options;
+            options.xsl_filename = toUM2String(xsl_filename);
+            options.write_knudsen_data = write_knudsen_data;
+            options.write_xsec_data = write_xsec_data;
+            options.boundary_conditions = toVector(boundary_conditions);
+
+            for (auto const & [material_name, xs_name, material_type] : mappings) {
+              options.materials.emplace_back(
+                  um2::mpact::MPACTMaterialMapping{
+                      toUM2String(material_name),
+                      toUM2String(xs_name),
+                      material_type
+                  });
+            }
+
+            py::gil_scoped_release nogil;
+            ErrorScope scope;
+
+            model.write(toUM2String(filename), options);
+
+            ErrorScope::check();
+          },
+          py::arg("filename"),
+          py::arg("xsl_filename"),
+          py::arg("material_mappings"),
+          py::arg("boundary_conditions") = std::vector<Int>{},
+          py::arg("write_knudsen_data") = false,
+          py::arg("write_xsec_data") = false,
+          "Write an MPACT model using a USER cross-section library.")
       .def(
           "read",
           [](um2::mpact::Model & model, std::string const & filename) {

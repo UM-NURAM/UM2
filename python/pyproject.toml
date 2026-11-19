@@ -12,7 +12,7 @@ license = { text = "MIT" }
 dependencies = ["numpy", "gmsh", "h5py"]
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "matplotlib"]
 
 [tool.scikit-build]
 # Build the whole UM2 project (the Python bindings are in python/)

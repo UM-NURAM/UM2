@@ -18,7 +18,7 @@ from .openmc.config import config
 from .openmc.geometry import Geometry
 from .openmc.material import Materials
 from .openmc.model import Model
-from .xs import load_library, mpact_xs
+from .xs import MPACTXS, load_library, mpact_xs, write_xsl
 
 
 def _core():
@@ -127,6 +127,11 @@ class MeshResult:
     materials: dict = field(default_factory=dict)
     #: Files written
     files: list = field(default_factory=list)
+    material_xs_names: dict = field(default_factory=dict)
+    cross_sections_path: Path | None = None
+    # MPACT boundary conditions in west, north, east, south, top, bottom order.
+    # None means they have not been inferred or explicitly supplied.
+    boundary_conditions: tuple[int, ...] | None = None
 
 
 def _mesh_type(mesh_type):
@@ -335,4 +340,166 @@ def mesh_geometry(model, *, plan=None, cross_sections=None, library=None,
                                  base.with_suffix('.input'),
                                  base.with_suffix('.volumes'),
                                  base.with_suffix('.xs')) if p.exists())
-    return MeshResult(mpact_model, plan, build, um2_mats, files)
+    material_xs_names = {
+        name: mat.macroscopic
+        for name, mat in build.materials.items()
+        if mat is not None and mat.macroscopic is not None
+    }
+
+    return MeshResult(
+        mpact_model,
+        plan,
+        build,
+        um2_mats,
+        files,
+        material_xs_names=material_xs_names,
+        cross_sections_path=_library_path(materials, cross_sections),
+    )
+
+def write_mesh_result(
+    result,
+    output,
+    *,
+    write_knudsen_data=False,
+    write_xsec_data=False,
+):
+    """Write a generated UM2 MPACT model to disk.
+
+    Parameters
+    ----------
+    result : MeshResult
+        Result returned by mesh_geometry().
+    output : str or Path
+        Destination XDMF filename.
+    write_knudsen_data : bool
+        Include Knudsen number data.
+    write_xsec_data : bool
+        Include cross-section data.
+
+    Returns
+    -------
+    list[Path]
+        Files written by the export operation.
+    """
+    output = Path(output)
+
+    if output.suffix != ".xdmf":
+        raise ValueError("output must be an .xdmf file")
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+
+    if result.cross_sections_path is not None:
+        library = load_library(result.cross_sections_path)
+        available_xs = set(library.names)
+
+        mappings = []
+        extra_sets = []
+        G = library.energy_groups.num_groups
+
+        for material in result.model.materials:
+            name = material.name
+            xs_name = result.material_xs_names.get(name)
+
+            # A void region has zero cross sections in UM2 but
+            # has no corresponding dataset in OpenMC's MGXS library.
+            is_void = (
+                name in result.build.materials
+                and result.build.materials[name] is None
+            )
+
+            if xs_name is None and is_void:
+                xs_name = name
+
+                if xs_name not in available_xs:
+                    if not material.has_xsec():
+                        raise ValueError(
+                            f'Void material "{name}" has no cross sections.'
+                        )
+
+                    xs = material.get_xsec()
+                    if any(np.any(xs[key]) for key in (
+                        "absorption", "fission", "nu_fission",
+                        "transport", "scatter_matrix"
+                    )):
+                        raise ValueError(
+                            f'Void material "{name}" has nonzero cross sections.'
+                        )
+
+                    zeros = np.zeros(G)
+
+                    extra_sets.append(
+                        MPACTXS(
+                            name=xs_name,
+                            absorption=zeros.copy(),
+                            nu_fission=zeros.copy(),
+                            fission=zeros.copy(),
+                            chi=zeros.copy(),
+                            scatter=[np.zeros((G, G))],
+                        )
+                    )
+                    available_xs.add(xs_name)
+
+            if xs_name is None:
+                raise ValueError(
+                    f'Material "{name}" has no cross-section mapping.'
+                )
+
+            if xs_name not in available_xs:
+                raise ValueError(
+                    f'Cross-section set "{xs_name}" for material '
+                    f'"{name}" was not found in the library.'
+                )
+
+            if not material.has_xsec():
+                raise ValueError(
+                    f'Material "{name}" has no macroscopic cross sections.'
+                )
+
+            material_type = (
+                2 if material.get_xsec()["fissile"] else 0
+            )
+
+            mappings.append((name, xs_name, material_type))
+
+        xsl_path = output.with_suffix(".xsl")
+
+        write_xsl(
+            library,
+            xsl_path,
+            extra_sets=extra_sets,
+        )
+
+        result.model.write(
+            str(output),
+            xsl_filename=xsl_path.name,
+            material_mappings=mappings,
+            write_knudsen_data=write_knudsen_data,
+            write_xsec_data=write_xsec_data,
+            boundary_conditions=result.boundary_conditions or (),
+        )
+
+    else:
+        result.model.write(
+            str(output),
+            write_knudsen_data,
+            write_xsec_data,
+        )
+
+    base = output.with_suffix("")
+
+    files = [
+        output,
+        base.with_suffix(".h5"),
+        base.with_suffix(".input"),
+        base.with_suffix(".volumes"),
+        base.with_suffix(".xs"),
+        base.with_suffix(".xsl"),
+    ]
+
+    files = [path for path in files if path.is_file()]
+
+    result.files.extend(
+        path for path in files if path not in result.files
+    )
+
+    return files

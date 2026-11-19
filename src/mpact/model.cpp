@@ -1949,7 +1949,8 @@ writeXDMFFile(String const & filepath, Model const & model,
 } // writeXDMFFile
 
 void
-writeInputFile(String const & filename, Model const & model)
+writeInputFile(String const & filename, Model const & model,
+               MPACTExportOptions const & options)
 {
 
   // Strip the ending from filename
@@ -1982,30 +1983,54 @@ writeInputFile(String const & filename, Model const & model)
   // MATERIAL
   file << "MATERIAL\n";
   Int const num_materials = model.materials().size();
+
   for (Int imat = 0; imat < num_materials; ++imat) {
     auto const & material = model.materials()[imat];
-    auto const density = material.getDensity();
-    auto const temperature = material.getTemperature();
-
-    String const mat_info = "  mat " + String(imat + 1) + " <type> " + String(density) +
-                            " g/cc " + String(temperature) + " K \\ ";
-    Int const mat_info_size = mat_info.size() - 5; // Account for <type> -> 1 char
 
     file << "  ! " << material.getName().data() << "\n";
-    file << mat_info.data();
 
-    // Write the ZAID and number density of each isotope
-    auto const & zaids = material.zaids();
-    auto const & densities = material.numDensities();
-    if (!zaids.empty()) {
-      ASSERT(zaids.size() == densities.size());
-      file << zaids[0] << " " << densities[0] << '\n';
-      for (Int i = 1; i < zaids.size(); ++i) {
-        // Insert the spaces
-        for (Int j = 0; j < mat_info_size; ++j) {
-          file << ' ';
+    if (!options.materials.empty()) {
+      // Find the export mapping by material name, not vector position.
+      for (auto const & mapping : options.materials) {
+        if (mapping.material_name == material.getName()) {
+          file << "  mat " << imat + 1 << " "
+              << mapping.material_type << " :: "
+              << mapping.xs_name.data() << "\n";
+          break;
         }
-        file << zaids[i] << " " << densities[i] << '\n';
+      }
+
+    } else {
+      // Original UM2 material writing for ORNL microscopic libraries.
+      auto const density = material.getDensity();
+      auto const temperature = material.getTemperature();
+      Int const material_type = material.xsec().isFissile() ? 2 : 0;
+
+      String const mat_info =
+          "  mat " + String(imat + 1) + " " + String(material_type) +
+          " " + String(density) + " g/cc " +
+          String(temperature) + " K \\ ";
+
+      Int const mat_info_size = mat_info.size();
+
+      file << mat_info.data();
+
+      auto const & zaids = material.zaids();
+      auto const & densities = material.numDensities();
+
+      if (!zaids.empty()) {
+        ASSERT(zaids.size() == densities.size());
+
+        file << zaids[0] << " " << densities[0] << '\n';
+
+        for (Int i = 1; i < zaids.size(); ++i) {
+          for (Int j = 0; j < mat_info_size; ++j) {
+            file << ' ';
+          }
+          file << zaids[i] << " " << densities[i] << '\n';
+        }
+      } else {
+        file << '\n';
       }
     }
   } // for (imat)
@@ -2017,7 +2042,11 @@ writeInputFile(String const & filename, Model const & model)
 
   // XSEC
   file << "XSEC\n";
-  file << "  xslib ORNL mpact51g_71_v4.2m5_12062016_sph.fmt\n\n";
+  if (!options.xsl_filename.empty()) {
+    file << "  xslib USER " << options.xsl_filename.data() << "\n\n";
+  } else {
+    file << "  xslib ORNL mpact51g_71_v4.2m5_12062016_sph.fmt\n\n";
+  }
 
   // OPTION
   // Get the mean chord length of the faces
@@ -2028,7 +2057,13 @@ writeInputFile(String const & filename, Model const & model)
   Int const num_faces_rep = static_cast<Int>((1 - 0.9) * num_faces);
   Float const mcl = mcls[num_faces_rep]; // The representative mean chord length
   file << "OPTION\n";
-  file << "  bound_cond <west_bc> <north_bc> <east_bc> <south_bc> <top_bc> <bottom_bc>\n";
+  if (!options.boundary_conditions.empty()) {
+    file << "  bound_cond";
+    for (Int const bc : options.boundary_conditions) {
+      file << " " << bc;
+    }
+    file << '\n';
+  }
   file << "  solver 1 2\n";
   file << "  ! ray spacing is set such that the expected number of intersections in the "
           "largest\n";
@@ -2217,16 +2252,87 @@ void
 Model::write(String const & filename, bool const write_knudsen_data,
              bool const write_xsec_data) const
 {
-  if (filename.ends_with(".xdmf")) {
-    writeXDMFFile(filename, *this, write_knudsen_data, write_xsec_data);
-  } else {
+  MPACTExportOptions options;
+  options.write_knudsen_data = write_knudsen_data;
+  options.write_xsec_data = write_xsec_data;
+
+  write(filename, options);
+}
+
+void
+Model::write(String const & filename, MPACTExportOptions const & options) const
+{
+  // Validate before creating any output files.
+  if (!filename.ends_with(".xdmf")) {
     logger::error("Unsupported file format.");
+    return;
   }
-  // Write the MPACT input file
-  writeInputFile(filename, *this);
-  // Write the volumes of each material
+
+  if (!options.boundary_conditions.empty()) {
+    if (options.boundary_conditions.size() != 6) {
+      logger::error("MPACT requires exactly six boundary conditions.");
+      return;
+    }
+
+    for (Int const bc : options.boundary_conditions) {
+      if (bc < 0 || bc > 2) {
+        logger::error("Invalid MPACT boundary condition.");
+        return;
+      }
+    }
+  }
+
+  if (!options.xsl_filename.empty() || !options.materials.empty()) {
+    if (options.xsl_filename.empty() ||
+        options.materials.size() != _materials.size()) {
+      logger::error("USER XSL export requires a library filename and "
+                    "one mapping per material.");
+      return;
+    }
+
+    for (auto const & material : _materials) {
+      Int matches = 0;
+
+      for (auto const & mapping : options.materials) {
+        if (mapping.material_name == material.getName()) {
+          ++matches;
+
+          if (mapping.xs_name.empty() ||
+              (mapping.material_type != 0 && mapping.material_type != 2)) {
+            logger::error("Invalid material export mapping.");
+            return;
+          }
+        }
+      }
+
+      if (matches != 1) {
+        logger::error("Every UM2 material must have exactly one "
+                      "cross-section mapping.");
+        return;
+      }
+    }
+
+    for (auto const & mapping : options.materials) {
+      Int matches = 0;
+      for (auto const & material : _materials) {
+        if (mapping.material_name == material.getName()) {
+          ++matches;
+        }
+      }
+
+      if (matches != 1) {
+        logger::error("Export mapping must reference exactly one "
+                      "UM2 material.");
+        return;
+      }
+    }
+  }
+
+  writeXDMFFile(filename, *this, options.write_knudsen_data,
+                options.write_xsec_data);
+
+  writeInputFile(filename, *this, options);
   writeMaterialVolumes(filename, *this);
-  // Write the cross sections of each material
   writeCrossSections(filename, *this);
 }
 

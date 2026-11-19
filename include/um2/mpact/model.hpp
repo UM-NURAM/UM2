@@ -55,6 +55,25 @@ namespace um2::mpact
 //          cells may contain a piece of a pin, multiple pins, or any other
 //          arbitrary geometry.
 
+struct MPACTMaterialMapping {
+  String material_name;
+  String xs_name;
+  Int material_type = 0;
+};
+
+struct MPACTExportOptions {
+  bool write_knudsen_data = false;
+  bool write_xsec_data = false;
+
+  String xsl_filename;
+  Vector<MPACTMaterialMapping> materials;
+
+  // West, north, east, south, top, bottom.
+  // 0 = vacuum, 1 = reflective, 2 = periodic.
+  // An empty vector means boundary conditions were not specified.
+  Vector<Int> boundary_conditions;
+};
+
 class Model
 {
 
@@ -292,6 +311,9 @@ public:
   void
   write(String const & filename, bool write_knudsen_data = false,
         bool write_xsec_data = false) const;
+
+  void
+  write(String const & filename, MPACTExportOptions const & options) const;
 
   // Return a vector of group-wise optical thicknesses for the coarse cell.
   // void

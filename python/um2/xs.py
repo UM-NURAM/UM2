@@ -191,7 +191,7 @@ def group_bounds(energy_groups: EnergyGroups) -> np.ndarray:
 
 
 def write_xsl(library, filename, names=None, temperature=None, title=None,
-              precision=6):
+              precision=6, *, extra_sets=()):
     """Write a multigroup library as an MPACT user cross section library.
 
     Parameters
@@ -222,6 +222,7 @@ def write_xsl(library, filename, names=None, temperature=None, title=None,
             raise ValueError('No cross section sets to write')
         bounds = None
         default_title = f'{sets[0].num_groups}-group macroscopic cross sections'
+    sets.extend(extra_sets)
     if bounds is None:
         raise ValueError('The group bounds are required; pass an MGXSLibrary')
     G = len(bounds)
